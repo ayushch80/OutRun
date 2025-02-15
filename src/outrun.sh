@@ -50,7 +50,7 @@ check_package() {
 
 # Verify All Required Packages
 check_required_packages() {
-    msg "INFO" "Checking system dependencies..."
+    msg "INFO" "Checking the system dependencies..."
     check_package "cloudflared"
     check_package "yq"
     check_package "npm"
@@ -79,29 +79,64 @@ init() {
     # Set project path, defaulting to the current directory if none is provided
     proj=$(realpath "${parameter:-.}")
 
-    msg "INFO" "Initializing OutRun project at: $proj"
-
-    # Define the out.run template
-    TEMPLATE_CONTENT="OUTRUN_VERSION: \"$VERSION\"\n# OutRun configuration file"
-
     # Check if the out.run file already exists
     if [ -f "$proj/out.run" ]; then
-        msg "ALERT" "An 'out.run' file already exists at $proj."
-
-        # Ask for confirmation to overwrite
-        read -p "Do you want to overwrite it? (y/N): " confirm
-        if [[ "$confirm" =~ ^[Yy]$ ]]; then
-            echo -e "$TEMPLATE_CONTENT" >"$proj/out.run"
-            msg "SUCCESS" "out.run file overwritten successfully."
-        else
-            msg "INFO" "Operation canceled. Keeping the existing 'out.run' file."
-            exit 0
-        fi
-    else
-        # Create a new out.run file if it doesn't exist
-        echo -e "$TEMPLATE_CONTENT" >"$proj/out.run"
-        msg "SUCCESS" "out.run file created successfully."
+        read -p "out.run exists. Overwrite? (y/N): " confirm
+        [[ "$confirm" =~ ^[Yy]$ ]] || exit 0
     fi
+
+    # Start generating the template
+    generate_template $proj
+}
+
+generate_template() {
+
+    TEMPLATE_CONTENT="# OutRun configuration file\nOUTRUN_VERSION: \"$VERSION\""
+    failCount=0 # Define fail count to prevent infinite loops
+    failMax=3 # Limit for fail count
+
+    pkgManagers=("npm" "yarn")
+
+    proj=$1
+    projName=''
+    projRoot='./'
+    projPkgManager=''
+
+    # Ask for project name until it fails
+    while [[ ! "$projName" =~ ^[a-z]+(-[a-z0-9]+)*$ ]]; do
+
+        ((failCount == failMax)) && { msg "ALERT" "Too many invalid attempts. Exiting..."; exit 1; }
+        ((failCount > 0)) && msg "ALERT" "Use kebab-case (e.g., 'my-project')."
+
+        read -e -p "Project Name: " projName
+
+        ((failCount++))
+    done
+    # Reset the fail count
+    failCount=0
+    # Append Project Name and Project Root to TEMPLATE_CONTENT
+    TEMPLATE_CONTENT+="\n\nproj: \"$projName\""
+    TEMPLATE_CONTENT+="\nroot: \"$projRoot\""
+
+    # Ask for Project Package manager (only npm and yarn are supported)
+    while [[ ! " ${pkgManagers[*]} " =~ " $projPkgManager " ]]; do
+
+        ((failCount == failMax)) && { msg "ALERT" "Too many invalid attempts. Exiting..."; exit 1; }
+        ((failCount > 0)) && msg "ALERT" "Only \"npm\" and \"yarn\" are supported."
+
+        read -e -p "Package Manager (npm/yarn): " projPkgManager
+
+        ((failCount++))
+    done
+    # Reset the fail count
+    failCount=0
+    # Append Project Name and Project Root to TEMPLATE_CONTENT
+    TEMPLATE_CONTENT+="\nmanager: \"$projPkgManager\""
+
+
+    # Save the template
+    echo -e "$TEMPLATE_CONTENT" >"$proj/out.run"
+    msg "SUCCESS" "[+] Template successfully generated."
 }
 
 # Command Execution Logic
