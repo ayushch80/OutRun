@@ -101,6 +101,7 @@ generate_template() {
     projName=''
     projRoot='./'
     projPkgManager=''
+    projPort='0'
 
     # Ask for project name until it fails
     while [[ ! "$projName" =~ ^[a-z]+(-[a-z0-9]+)*$ ]]; do
@@ -133,6 +134,21 @@ generate_template() {
     # Append Project Name and Project Root to TEMPLATE_CONTENT
     TEMPLATE_CONTENT+="\nmanager: \"$projPkgManager\""
 
+
+    # Ask for project port
+    while ((projPort < 1024 | projPort > 49151));
+    do
+        ((failCount == failMax)) && { msg "ALERT" "Too many invalid attempts. Exiting..."; exit 1; }
+        ((failCount > 0)) && msg "ALERT" "Only ports in range [1024-49151] are supported."
+
+        read -e -p "Project Port: " projPort
+
+        ((failCount++))
+    done
+    # Reset the fail count
+    failCount=0
+    # Append Project Name and Project Root to TEMPLATE_CONTENT
+    TEMPLATE_CONTENT+="\nport: \"$projPort\""
 
     # Save the template
     echo -e "$TEMPLATE_CONTENT" >"$proj/out.run"
