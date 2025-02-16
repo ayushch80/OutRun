@@ -92,10 +92,8 @@ init() {
 generate_template() {
 
     TEMPLATE_CONTENT="# OutRun configuration file\nOUTRUN_VERSION: \"$VERSION\""
-    failCount=0 # Define fail count to prevent infinite loops
-    failMax=3 # Limit for fail count
 
-    pkgManagers=("npm" "yarn")
+    pkgManagers=("npm")
 
     proj=$1
     projName=''
@@ -103,56 +101,52 @@ generate_template() {
     projPkgManager=''
     projPort='0'
 
-    # Ask for project name until it fails
-    while [[ ! "$projName" =~ ^[a-z]+(-[a-z0-9]+)*$ ]]; do
+    prompt_until_valid() {
+        prompt_message=$1
+        validation_rule=$2
+        error_message=$3
+        variable=$4
 
-        ((failCount == failMax)) && { msg "ALERT" "Too many invalid attempts. Exiting..."; exit 1; }
-        ((failCount > 0)) && msg "ALERT" "Use kebab-case (e.g., 'my-project')."
+        failCount=0 # Tracks the number of failed attempts
+        failMax=3   # Maximum allowed failed attempts
 
-        read -e -p "Project Name: " projName
+        while ! eval $validation_rule; do
+            ((failCount == failMax)) && {
+                msg "ALERT" "Too many invalid attempts. Exiting..."
+                exit 1
+            }
+            ((failCount > 0)) && { msg "ALERT" "$error_message\n"; }
 
-        ((failCount++))
-    done
-    # Reset the fail count
-    failCount=0
-    # Append Project Name and Project Root to TEMPLATE_CONTENT
+            read -e -p "$prompt_message" "$variable"
+
+            ((failCount++))
+        done
+    }
+
+    prompt_until_valid "Project Name: " \
+        '[[ "$projName" =~ ^[a-z]+(-[a-z0-9]+)*$ ]]' \
+        "Invalid format. Use kebab-case (e.g., 'my-project')." \
+        projName
+
+    prompt_until_valid "Package Manager (npm): " \
+        '[[ " ${pkgManagers[*]} " =~ " $projPkgManager " ]]' \
+        "Invalid selection. Only \"npm\" is supported." \
+        projPkgManager
+    
+    prompt_until_valid "Project Port: " \
+        '[[ "$projPort" -ge 1024 && "$projPort" -le 49151 ]]' \
+        "Invalid port. Choose a value between 1024 and 49151." \
+        projPort
+
+    # Construct the Template
     TEMPLATE_CONTENT+="\n\nproj: \"$projName\""
     TEMPLATE_CONTENT+="\nroot: \"$projRoot\""
-
-    # Ask for Project Package manager (only npm and yarn are supported)
-    while [[ ! " ${pkgManagers[*]} " =~ " $projPkgManager " ]]; do
-
-        ((failCount == failMax)) && { msg "ALERT" "Too many invalid attempts. Exiting..."; exit 1; }
-        ((failCount > 0)) && msg "ALERT" "Only \"npm\" and \"yarn\" are supported."
-
-        read -e -p "Package Manager (npm/yarn): " projPkgManager
-
-        ((failCount++))
-    done
-    # Reset the fail count
-    failCount=0
-    # Append Project Name and Project Root to TEMPLATE_CONTENT
     TEMPLATE_CONTENT+="\nmanager: \"$projPkgManager\""
-
-
-    # Ask for project port
-    while ((projPort < 1024 | projPort > 49151));
-    do
-        ((failCount == failMax)) && { msg "ALERT" "Too many invalid attempts. Exiting..."; exit 1; }
-        ((failCount > 0)) && msg "ALERT" "Only ports in range [1024-49151] are supported."
-
-        read -e -p "Project Port: " projPort
-
-        ((failCount++))
-    done
-    # Reset the fail count
-    failCount=0
-    # Append Project Name and Project Root to TEMPLATE_CONTENT
     TEMPLATE_CONTENT+="\nport: \"$projPort\""
 
     # Save the template
     echo -e "$TEMPLATE_CONTENT" >"$proj/out.run"
-    msg "SUCCESS" "[+] Template successfully generated."
+    msg "SUCCESS" "[+] Configuration file successfully created."
 }
 
 # Command Execution Logic
