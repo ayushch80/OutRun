@@ -27,6 +27,9 @@ MAGENTA='\e[35m'
 CYAN='\e[36m'
 RESET='\e[0m'
 
+# Tab Character
+t="    " # Four spaces
+
 # Function to Display Messages with Colors
 msg() {
     case $1 in
@@ -91,7 +94,7 @@ init() {
 
 generate_template() {
 
-    TEMPLATE_CONTENT="# OutRun configuration file\nOUTRUN_VERSION: \"$VERSION\""
+    TEMPLATE_CONTENT="OUTRUN_VERSION: \"$VERSION\""
 
     pkgManagers=("npm")
 
@@ -100,6 +103,11 @@ generate_template() {
     projRoot='./'
     projPkgManager=''
     projPort='0'
+
+    # cmd
+    cmdDefault=''
+    cmdBuild='npm run build'
+    cmdStart='npm run start'
 
     prompt_until_valid() {
         prompt_message=$1
@@ -115,8 +123,9 @@ generate_template() {
                 msg "ALERT" "Too many invalid attempts. Exiting..."
                 exit 1
             }
-            ((failCount > 0)) && { msg "ALERT" "$error_message\n"; }
-
+            ((failCount > 0)) && { msg "ALERT" "$error_message"; }
+            
+            msg ""
             read -e -p "$prompt_message" "$variable"
 
             ((failCount++))
@@ -132,17 +141,35 @@ generate_template() {
         '[[ " ${pkgManagers[*]} " =~ " $projPkgManager " ]]' \
         "Invalid selection. Only \"npm\" is supported." \
         projPkgManager
-    
+
     prompt_until_valid "Project Port: " \
         '[[ "$projPort" -ge 1024 && "$projPort" -le 49151 ]]' \
         "Invalid port. Choose a value between 1024 and 49151." \
         projPort
+
+    read -e -p "Keep default commands? (Y/n): " cmdDefault
+    msg ""
+    cmdDefault=${cmdDefault,,}
+
+    if [[ "$cmdDefault" == "y" || -z "$cmdDefault" ]]; then
+        : # Eat 5 Star. Do Nothing.
+    else
+        read -e -p "Build command: " cmdBuild
+        msg ""
+        read -e -p "Start command: " cmdStart
+        msg ""
+    fi
 
     # Construct the Template
     TEMPLATE_CONTENT+="\n\nproj: \"$projName\""
     TEMPLATE_CONTENT+="\nroot: \"$projRoot\""
     TEMPLATE_CONTENT+="\nmanager: \"$projPkgManager\""
     TEMPLATE_CONTENT+="\nport: \"$projPort\""
+    TEMPLATE_CONTENT+="\n\ncmd:"
+    TEMPLATE_CONTENT+="\n${t}build: \"$cmdBuild\""
+    TEMPLATE_CONTENT+="\n${t}start: \"$cmdStart\""
+
+    TEMPLATE_CONTENT+="\n\n# OutRun configuration file"
 
     # Save the template
     echo -e "$TEMPLATE_CONTENT" >"$proj/out.run"
